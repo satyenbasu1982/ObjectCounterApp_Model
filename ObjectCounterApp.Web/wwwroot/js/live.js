@@ -5,10 +5,10 @@ const ERROR_RETRY_DELAY_MS = 500;
 // Tracking tuning: raw per-frame detections are independent (no memory of
 // previous frames), so borderline identity matches flip name<->generic and
 // a single missed frame makes a box vanish. These smooth that out.
-const IOU_MATCH_THRESHOLD = 0.3;   // min overlap to treat a new box as "the same person" as an existing track
-const BOX_SMOOTHING_ALPHA = 0.4;   // lower = smoother/laggier box movement, higher = snappier/jitterier
-const IDENTITY_CONFIRM_FRAMES = 3; // consecutive frames a new label must win before the displayed label switches
-const MAX_MISSED_FRAMES = 3;       // frames a track survives with no matching detection before it's dropped
+const IOU_MATCH_THRESHOLD = 0.3;  // min overlap to treat a new box as "the same person" as an existing track
+const BOX_SMOOTHING_ALPHA = 0.4;  // lower = smoother/laggier box movement, higher = snappier/jitterier
+const LABEL_HISTORY_SIZE = 5;     // recent raw labels kept per track; displayed label = the majority within this window
+const MAX_MISSED_FRAMES = 3;      // frames a track survives with no matching detection before it's dropped
 
 const startBtn = document.getElementById("startCameraBtn");
 const stopBtn = document.getElementById("stopCameraBtn");
@@ -48,6 +48,28 @@ function overlapScore(a, b) {
   const smaller = Math.min(areaA, areaB);
   const containment = smaller <= 0 ? 0 : interArea / smaller;
   return Math.max(iouScore, containment);
+}
+
+// Picks whichever label occurs most often in a track's recent label history,
+// breaking ties in favor of the currently-displayed label so an even split
+// doesn't cause pointless flicker. A single noisy frame only dilutes the
+// window slightly rather than resetting progress toward the correct answer,
+// so this converges faster than requiring N strictly consecutive matches.
+function pickMajorityLabel(history, currentLabel) {
+  const counts = new Map();
+  for (const label of history) {
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+
+  let bestLabel = currentLabel;
+  let bestCount = counts.get(currentLabel) || 0;
+  for (const [label, count] of counts) {
+    if (count > bestCount) {
+      bestCount = count;
+      bestLabel = label;
+    }
+  }
+  return bestLabel;
 }
 
 function smoothBox(oldBox, newBox) {
@@ -100,21 +122,26 @@ function updateTracks(detections) {
       bestTrack.isLikelyReal = det.isLikelyReal;
       bestTrack.missedFrames = 0;
 
-      if (rawLabel === bestTrack.label) {
-        bestTrack.pendingLabel = null;
-        bestTrack.pendingCount = 0;
-      } else if (rawLabel === bestTrack.pendingLabel) {
-        bestTrack.pendingCount++;
-        if (bestTrack.pendingCount >= IDENTITY_CONFIRM_FRAMES) {
-          bestTrack.label = rawLabel;
-          bestTrack.pendingLabel = null;
-          bestTrack.pendingCount = 0;
+      // Only a frame where a face was actually found carries real identity
+      // information (a genuine match, or a genuine "Unknown"). A frame where
+      // detection simply failed - very common under glare/backlight - isn't
+      // evidence the person changed, it's just a gap, so it must not be
+      // allowed to erode an already-established name back to the generic
+      // fallback. Once a face has been seen, the label only updates from
+      // further face-based results.
+      if (hasFaceBox) {
+        bestTrack.labelHistory.push(rawLabel);
+        if (bestTrack.labelHistory.length > LABEL_HISTORY_SIZE) {
+          bestTrack.labelHistory.shift();
         }
-      } else {
-        bestTrack.pendingLabel = rawLabel;
-        bestTrack.pendingCount = 1;
+        bestTrack.label = pickMajorityLabel(bestTrack.labelHistory, bestTrack.label);
       }
-    } else {
+    } else if (hasFaceBox) {
+      // Only spawn a new track once a face has actually been found and
+      // identity-checked (a real name or "Unknown") - this page only cares
+      // about resolved identities, so a bare person/body detection (no face
+      // found yet) never puts a generic "Person" box on screen. An unmatched
+      // bare detection is simply ignored here.
       matchedTrackIds.add(nextTrackId);
       tracks.push({
         id: nextTrackId++,
@@ -123,8 +150,7 @@ function updateTracks(detections) {
         score: det.score,
         isLikelyReal: det.isLikelyReal,
         missedFrames: 0,
-        pendingLabel: null,
-        pendingCount: 0
+        labelHistory: [rawLabel]
       });
     }
   }
