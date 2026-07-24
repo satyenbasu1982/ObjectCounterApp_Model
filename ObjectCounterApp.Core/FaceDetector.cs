@@ -27,7 +27,12 @@ namespace ObjectCounterApp.Core
     {
         private const int InputSize = 640;
         private static readonly int[] Strides = { 8, 16, 32 };
-        private const float ScoreThreshold = 0.6f;
+        // Lowered from the model's own default of 0.6 - real-world webcam faces
+        // (glasses glare, partial occlusion, backlight) often score in the
+        // 0.4-0.6 range and were being discarded outright. Trade-off: slightly
+        // noisier landmarks on marginal detections, shared by every caller
+        // (enrollment, still-image detect, live).
+        private const float ScoreThreshold = 0.5f;
         private const float NmsIouThreshold = 0.3f;
 
         // ONNX Runtime InferenceSession.Run is safe to call concurrently from

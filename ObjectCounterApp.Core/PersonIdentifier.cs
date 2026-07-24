@@ -47,7 +47,7 @@ namespace ObjectCounterApp.Core
                     continue;
                 }
 
-                using var crop = CropToBox(image, detection);
+                using var crop = CropToBox(image, detection, out int offsetX, out int offsetY);
                 // A downsampled, normalized copy is used only to help detection find
                 // the face under backlight - alignment/embedding use the original,
                 // full-resolution crop so FaceEmbedder.Embed's own correction isn't
@@ -65,7 +65,16 @@ namespace ObjectCounterApp.Core
                 using var aligned = FaceAligner.Align(crop, landmarks);
                 var embedding = _faceEmbedder.Embed(aligned);
                 var name = IdentityMatcher.Match(embedding, enrolledPeople) ?? "Unknown";
-                results.Add(detection with { IdentityName = name });
+
+                var faceBox = RescaleFaceBox(face.Value, detectionInput, crop);
+                results.Add(detection with
+                {
+                    IdentityName = name,
+                    FaceX1 = (offsetX + faceBox.X1) / image.Width,
+                    FaceY1 = (offsetY + faceBox.Y1) / image.Height,
+                    FaceX2 = (offsetX + faceBox.X2) / image.Width,
+                    FaceY2 = (offsetY + faceBox.Y2) / image.Height
+                });
             }
 
             return results;
@@ -130,13 +139,26 @@ namespace ObjectCounterApp.Core
             return rescaled;
         }
 
-        private static SKBitmap CropToBox(SKBitmap image, Detection detection)
+        // Same rescale as RescaleLandmarks, applied to the face's own bounding
+        // box (discarded everywhere else - PersonIdentifier only used the
+        // landmarks - but useful to the client for drawing a box tight to the
+        // face instead of the whole person).
+        private static (float X1, float Y1, float X2, float Y2) RescaleFaceBox(FaceCandidate face, SKBitmap from, SKBitmap to)
+        {
+            float scaleX = to.Width / (float)from.Width;
+            float scaleY = to.Height / (float)from.Height;
+            return (face.X1 * scaleX, face.Y1 * scaleY, face.X2 * scaleX, face.Y2 * scaleY);
+        }
+
+        private static SKBitmap CropToBox(SKBitmap image, Detection detection, out int offsetX, out int offsetY)
         {
             int x1 = Math.Clamp((int)(detection.X1 * image.Width), 0, image.Width - 1);
             int y1 = Math.Clamp((int)(detection.Y1 * image.Height), 0, image.Height - 1);
             int x2 = Math.Clamp((int)(detection.X2 * image.Width), x1 + 1, image.Width);
             int y2 = Math.Clamp((int)(detection.Y2 * image.Height), y1 + 1, image.Height);
 
+            offsetX = x1;
+            offsetY = y1;
             return ImageOps.Crop(image, x1, y1, x2 - x1, y2 - y1);
         }
     }

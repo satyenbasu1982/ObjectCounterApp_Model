@@ -31,7 +31,11 @@ function resizeCanvasToElement(canvas, referenceEl) {
   canvas.height = referenceEl.clientHeight;
 }
 
-function iou(a, b) {
+// Plain IoU under-matches when comparing a tight face box against a much
+// bigger person box (e.g. a frame where no face box came back that round) -
+// falling back to "how much of the smaller box sits inside the bigger one"
+// keeps the same person's track matched across box-size changes.
+function overlapScore(a, b) {
   const x1 = Math.max(a.x1, b.x1);
   const y1 = Math.max(a.y1, b.y1);
   const x2 = Math.min(a.x2, b.x2);
@@ -40,7 +44,10 @@ function iou(a, b) {
   const areaA = (a.x2 - a.x1) * (a.y2 - a.y1);
   const areaB = (b.x2 - b.x1) * (b.y2 - b.y1);
   const union = areaA + areaB - interArea;
-  return union <= 0 ? 0 : interArea / union;
+  const iouScore = union <= 0 ? 0 : interArea / union;
+  const smaller = Math.min(areaA, areaB);
+  const containment = smaller <= 0 ? 0 : interArea / smaller;
+  return Math.max(iouScore, containment);
 }
 
 function smoothBox(oldBox, newBox) {
@@ -61,21 +68,34 @@ function updateTracks(detections) {
 
   for (const det of detections) {
     const rawLabel = !det.isLikelyReal ? "Possibly not real" : (det.identityName || det.label);
+    const hasFaceBox = det.faceX1 != null;
+    // Prefer the face box (tight to the actual face) over the person/body box
+    // whenever identify found one - the whole point is the box tracking the
+    // face regardless of how the person is sitting/posed.
+    const box = hasFaceBox
+      ? { x1: det.faceX1, y1: det.faceY1, x2: det.faceX2, y2: det.faceY2 }
+      : { x1: det.x1, y1: det.y1, x2: det.x2, y2: det.y2 };
 
     let bestTrack = null;
-    let bestIou = IOU_MATCH_THRESHOLD;
+    let bestScore = IOU_MATCH_THRESHOLD;
     for (const track of tracks) {
       if (matchedTrackIds.has(track.id)) continue;
-      const trackIou = iou(track.box, det);
-      if (trackIou > bestIou) {
-        bestIou = trackIou;
+      const score = overlapScore(track.box, box);
+      if (score > bestScore) {
+        bestScore = score;
         bestTrack = track;
       }
     }
 
     if (bestTrack) {
       matchedTrackIds.add(bestTrack.id);
-      bestTrack.box = smoothBox(bestTrack.box, det);
+      // Only move the drawn box when this frame actually found a face box -
+      // a frame where the face was momentarily missed (occlusion/glare) still
+      // matches and keeps the person "seen", but shouldn't snap the box out
+      // to the much bigger person box for one frame.
+      if (hasFaceBox) {
+        bestTrack.box = smoothBox(bestTrack.box, box);
+      }
       bestTrack.score = det.score;
       bestTrack.isLikelyReal = det.isLikelyReal;
       bestTrack.missedFrames = 0;
@@ -98,7 +118,7 @@ function updateTracks(detections) {
       matchedTrackIds.add(nextTrackId);
       tracks.push({
         id: nextTrackId++,
-        box: { x1: det.x1, y1: det.y1, x2: det.x2, y2: det.y2 },
+        box,
         label: rawLabel,
         score: det.score,
         isLikelyReal: det.isLikelyReal,

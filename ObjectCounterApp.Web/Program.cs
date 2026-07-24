@@ -58,7 +58,11 @@ app.MapPost("/api/detect", async (HttpRequest request, PersonDetector detector, 
                 x2 = d.X2,
                 y2 = d.Y2,
                 isLikelyReal = d.IsLikelyReal,
-                identityName = d.IdentityName
+                identityName = d.IdentityName,
+                faceX1 = d.FaceX1,
+                faceY1 = d.FaceY1,
+                faceX2 = d.FaceX2,
+                faceY2 = d.FaceY2
             })
         });
     }
