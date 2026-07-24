@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enroll People</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <h1>Enroll People</h1>
+  <nav class="main-nav">
+    <a href="index.html">Detect</a>
+    <a href="enroll.html" class="active">Enroll People</a>
+    <a href="people.html">People</a>
+    <a href="live.html">Live Camera</a>
+  </nav>
+
+  <section class="panel">
+    <p class="hint">Upload a photo and a name, then click Save. One photo is enough, but adding 2-3 photos in different conditions (with/without glasses, a slightly different angle) makes matching more reliable.</p>
+    <form id="enrollForm" class="enroll-form">
+      <input id="enrollName" type="text" placeholder="Name" required />
+      <input id="enrollPhotos" type="file" accept="image/*" multiple required />
+      <button type="submit">Save</button>
+    </form>
+    <p id="enrollStatus" class="status"></p>
+    <ul id="peopleList" class="people-list"></ul>
+  </section>
+
+  <script src="js/enroll.js"></script>
+</body>
+</html>

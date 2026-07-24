@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>People</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <h1>People</h1>
+  <nav class="main-nav">
+    <a href="index.html">Detect</a>
+    <a href="enroll.html">Enroll People</a>
+    <a href="people.html" class="active">People</a>
+    <a href="live.html">Live Camera</a>
+  </nav>
+
+  <section class="panel">
+    <input id="peopleSearch" type="text" class="search-box" placeholder="Search by name..." />
+    <p id="peopleStatus" class="status"></p>
+    <table class="people-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th><button type="button" class="sort-btn" data-sort="name">Name</button></th>
+          <th><button type="button" class="sort-btn" data-sort="photoCount">Photos</button></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="peopleTableBody"></tbody>
+    </table>
+  </section>
+
+  <script src="js/people.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ObjectCounterApp.Core\ObjectCounterApp.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\human-detector.onnx" Link="human-detector.onnx" Condition="Exists('..\human-detector.onnx')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\face_detection_yunet_2023mar.onnx" Link="face_detection_yunet_2023mar.onnx" Condition="Exists('..\face_detection_yunet_2023mar.onnx')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\face_recognition_sface_2021dec.onnx" Link="face_recognition_sface_2021dec.onnx" Condition="Exists('..\face_recognition_sface_2021dec.onnx')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

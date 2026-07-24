@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Object Counter</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <h1>Person Detector</h1>
+  <nav class="main-nav">
+    <a href="index.html" class="active">Detect</a>
+    <a href="enroll.html">Enroll People</a>
+    <a href="people.html">People</a>
+    <a href="live.html">Live Camera</a>
+  </nav>
+
+  <section class="panel">
+    <h2>Image</h2>
+    <div id="imageDropzone" class="dropzone">
+      <p>Drag &amp; drop an image here, or click to browse</p>
+      <input id="imageInput" type="file" accept="image/*" hidden />
+    </div>
+    <p id="imageStatus" class="status"></p>
+    <div id="imageStage" class="stage" hidden>
+      <img id="imagePreview" alt="Preview" />
+      <canvas id="imageCanvas"></canvas>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Video</h2>
+    <div id="videoDropzone" class="dropzone">
+      <p>Drag &amp; drop a video here, or click to browse</p>
+      <input id="videoInput" type="file" accept="video/*" hidden />
+    </div>
+    <p id="videoStatus" class="status"></p>
+    <div id="videoStage" class="stage" hidden>
+      <video id="videoPreview" controls></video>
+      <canvas id="videoCanvas"></canvas>
+    </div>
+  </section>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

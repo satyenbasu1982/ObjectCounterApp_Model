@@ -1,0 +1,24 @@
+# Build artifacts
+bin/
+obj/
+*.csproj.user
+
+# IDE
+.vs/
+
+# Python virtual environment (training/) - regenerate via requirements.txt
+training/.venv/
+
+# Training run outputs and logs - large, regenerable
+training/runs/
+*.log
+
+# Pretrained/stock checkpoint auto-downloaded by ultralytics
+training/yolov8n.pt
+
+# Large model artifact not referenced anywhere in the app
+ai-image-detector.onnx
+human-detector.640-original.bak.onnx
+
+# Enrolled people data - real photos + face embeddings (biometric/PII), not for source control
+DataSet/

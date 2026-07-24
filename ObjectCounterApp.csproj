@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ObjectCounterApp.Core and ObjectCounterApp.Web live in subfolders of this
+         project's own directory; exclude their sources from this project's default
+         glob so they aren't compiled twice (once here, once in their own project). -->
+    <Compile Remove="ObjectCounterApp.Core\**\*.cs" />
+    <Compile Remove="ObjectCounterApp.Web\**\*.cs" />
+    <Compile Remove="ObjectCounterApp.Core\**\obj\**" />
+    <Compile Remove="ObjectCounterApp.Web\**\obj\**" />
+    <ProjectReference Include="ObjectCounterApp.Core\ObjectCounterApp.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="human-detector.onnx" Condition="Exists('human-detector.onnx')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="test_image.jpg" Condition="Exists('test_image.jpg')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

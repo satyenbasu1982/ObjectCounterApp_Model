@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="ObjectCounterApp.csproj" />
+  <Project Path="ObjectCounterApp.Core\ObjectCounterApp.Core.csproj" />
+  <Project Path="ObjectCounterApp.Web\ObjectCounterApp.Web.csproj" />
+</Solution>

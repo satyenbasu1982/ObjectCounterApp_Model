@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Camera</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <h1>Live Camera</h1>
+  <nav class="main-nav">
+    <a href="index.html">Detect</a>
+    <a href="enroll.html">Enroll People</a>
+    <a href="people.html">People</a>
+    <a href="live.html" class="active">Live Camera</a>
+  </nav>
+
+  <section class="panel">
+    <div class="camera-controls">
+      <button id="startCameraBtn" type="button">Start Camera</button>
+      <button id="stopCameraBtn" type="button" disabled>Stop Camera</button>
+    </div>
+    <p id="liveStatus" class="status"></p>
+    <div id="liveStage" class="stage" hidden>
+      <video id="livePreview" autoplay playsinline muted></video>
+      <canvas id="liveCanvas"></canvas>
+    </div>
+  </section>
+
+  <script src="js/live.js"></script>
+</body>
+</html>
