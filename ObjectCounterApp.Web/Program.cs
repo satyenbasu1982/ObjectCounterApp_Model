@@ -10,13 +10,15 @@ var dataSetPath = Path.Combine(builder.Environment.ContentRootPath, "..", "DataS
 var attendancePath = Path.Combine(dataSetPath, "Attandance");
 var absenceTimeoutMinutes = builder.Configuration.GetValue("Attendance:AbsenceTimeoutMinutes", 1);
 
-// EnrolledPeopleStore is registered under both its concrete type and
-// IEnrolledPeopleStore (same instance) because PersonIdentifier's
-// constructor still takes the concrete type - everything else in this app
-// depends on the interfaces.
+// EnrolledPeopleStore and PersonDetector are registered under both their
+// concrete type and their interface (same instance) because
+// PersonIdentifier's constructor still takes the concrete types -
+// everything else in this app depends on the interfaces.
 var peopleStore = new EnrolledPeopleStore(dataSetPath);
+var personDetector = new PersonDetector(personModelPath);
 
-builder.Services.AddSingleton(new PersonDetector(personModelPath));
+builder.Services.AddSingleton(personDetector);
+builder.Services.AddSingleton<IPersonDetector>(personDetector);
 builder.Services.AddSingleton(new FaceDetector(yunetModelPath));
 builder.Services.AddSingleton(new FaceEmbedder(sfaceModelPath));
 builder.Services.AddSingleton(peopleStore);

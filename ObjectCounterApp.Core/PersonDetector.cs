@@ -3,7 +3,12 @@ using Microsoft.ML;
 
 namespace ObjectCounterApp.Core
 {
-    public sealed class PersonDetector
+    public interface IPersonDetector
+    {
+        List<Detection> DetectPersons(string imagePath);
+    }
+
+    public sealed class PersonDetector : IPersonDetector
     {
         // Output tensor layout is (1, 4 + nc, totalProposals) = (1, 6, 8400) for this
         // custom 2-class ("person", "person-like") model. Detections are filtered

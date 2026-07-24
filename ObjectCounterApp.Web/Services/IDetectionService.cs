@@ -10,13 +10,13 @@ namespace ObjectCounterApp.Web.Services
 
     public sealed class DetectionService : IDetectionService
     {
-        private readonly PersonDetector _personDetector;
+        private readonly IPersonDetector _personDetector;
         private readonly IPersonIdentifier _personIdentifier;
         private readonly IAttendanceStore _attendanceStore;
         private readonly ITempFileService _tempFileService;
 
         public DetectionService(
-            PersonDetector personDetector,
+            IPersonDetector personDetector,
             IPersonIdentifier personIdentifier,
             IAttendanceStore attendanceStore,
             ITempFileService tempFileService)

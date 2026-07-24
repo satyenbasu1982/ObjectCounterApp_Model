@@ -8,13 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- ObjectCounterApp.Core and ObjectCounterApp.Web live in subfolders of this
-         project's own directory; exclude their sources from this project's default
-         glob so they aren't compiled twice (once here, once in their own project). -->
+    <!-- ObjectCounterApp.Core, ObjectCounterApp.Web, and ObjectCounterApp.Tests
+         live in subfolders of this project's own directory; exclude their
+         sources from this project's default glob so they aren't compiled
+         twice (once here, once in their own project). -->
     <Compile Remove="ObjectCounterApp.Core\**\*.cs" />
     <Compile Remove="ObjectCounterApp.Web\**\*.cs" />
+    <Compile Remove="ObjectCounterApp.Tests\**\*.cs" />
     <Compile Remove="ObjectCounterApp.Core\**\obj\**" />
     <Compile Remove="ObjectCounterApp.Web\**\obj\**" />
+    <Compile Remove="ObjectCounterApp.Tests\**\obj\**" />
     <ProjectReference Include="ObjectCounterApp.Core\ObjectCounterApp.Core.csproj" />
   </ItemGroup>
 
