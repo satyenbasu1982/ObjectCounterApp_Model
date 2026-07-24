@@ -13,11 +13,21 @@ namespace ObjectCounterApp.Core
         NameTaken
     }
 
+    public interface IEnrolledPeopleStore
+    {
+        void AddEmbedding(string name, float[] embedding, byte[] photoBytes, string contentType);
+        bool Remove(string name);
+        IReadOnlyList<string> ListNames();
+        IReadOnlyList<(string Name, IReadOnlyList<float[]> Embeddings)> GetAll();
+        IReadOnlyList<(string Name, int PhotoCount, string? ThumbnailBase64, string? ThumbnailContentType)> GetSummaries();
+        RenameResult Rename(string oldName, string newName);
+    }
+
     // Persists enrolled people (name + one or more reference photos/embeddings) as
     // one JSON file per person under a directory - a "poor man's document store".
     // Independent files mean one corrupt/malformed record can't take down the rest,
     // unlike a single shared JSON file. No real database needed at this scale.
-    public sealed class EnrolledPeopleStore
+    public sealed class EnrolledPeopleStore : IEnrolledPeopleStore
     {
         private sealed class Photo
         {

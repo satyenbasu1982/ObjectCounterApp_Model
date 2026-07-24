@@ -26,6 +26,12 @@ let consecutiveErrors = 0;
 let tracks = [];
 let nextTrackId = 0;
 
+// A kiosk device opens this page as live.html?autostart=true so it runs
+// unattended with no button click - only that instance should log
+// attendance, so someone manually testing recognition at their desk on this
+// same page doesn't spuriously log themselves as "in the office".
+const isKioskMode = new URLSearchParams(window.location.search).get("autostart") === "true";
+
 function resizeCanvasToElement(canvas, referenceEl) {
   canvas.width = referenceEl.clientWidth;
   canvas.height = referenceEl.clientHeight;
@@ -198,7 +204,13 @@ async function detect(blob, identify) {
   const formData = new FormData();
   formData.append("file", blob, "frame.jpg");
 
-  const url = identify ? `${DETECT_URL}?identify=true` : DETECT_URL;
+  let url = DETECT_URL;
+  if (identify) {
+    url += "?identify=true";
+    if (isKioskMode) {
+      url += "&attendance=true";
+    }
+  }
   const response = await fetch(url, {
     method: "POST",
     body: formData
@@ -297,3 +309,7 @@ video.addEventListener("loadedmetadata", () => {
 });
 
 new ResizeObserver(() => resizeCanvasToElement(canvas, video)).observe(video);
+
+if (isKioskMode) {
+  startCamera();
+}

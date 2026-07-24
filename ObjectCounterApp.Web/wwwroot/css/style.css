@@ -106,6 +106,15 @@ h1 {
   vertical-align: middle;
 }
 
+.attendance-summary-row {
+  font-weight: bold;
+}
+
+.attendance-session-row {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
 .people-table .sort-btn {
   border: none;
   background: transparent;

@@ -4,11 +4,17 @@ using SkiaSharp;
 
 namespace ObjectCounterApp.Core
 {
+    public interface IPersonIdentifier
+    {
+        List<Detection> DetectAndIdentify(string imagePath);
+        float[]? ComputeEmbeddingForEnrollment(string imagePath);
+    }
+
     // Orchestrates person detection + per-person face identity matching:
     // crop each detected person's box -> find their face -> align -> embed ->
     // compare against enrolled people. Only real ("person") detections are
     // checked for identity - "person-like" detections are left as-is.
-    public sealed class PersonIdentifier
+    public sealed class PersonIdentifier : IPersonIdentifier
     {
         private readonly PersonDetector _personDetector;
         private readonly FaceDetector _faceDetector;

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attendance</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <h1>Attendance</h1>
+  <nav class="main-nav">
+    <a href="index.html">Detect</a>
+    <a href="enroll.html">Enroll People</a>
+    <a href="people.html">People</a>
+    <a href="live.html">Live Camera</a>
+    <a href="attendance.html" class="active">Attendance</a>
+  </nav>
+
+  <section class="panel">
+    <div class="camera-controls">
+      <input id="attendanceDate" type="date" />
+      <button id="refreshBtn" type="button">Refresh</button>
+      <button id="exportBtn" type="button">Export to Excel</button>
+    </div>
+    <p id="attendanceStatus" class="status"></p>
+    <table class="people-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>First In</th>
+          <th>Last Seen / Out</th>
+          <th>Total Time</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="attendanceTableBody"></tbody>
+    </table>
+  </section>
+
+  <script src="js/attendance.js"></script>
+</body>
+</html>
