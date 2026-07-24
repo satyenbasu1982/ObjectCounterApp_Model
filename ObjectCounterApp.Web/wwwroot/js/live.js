@@ -11,6 +11,7 @@ const LABEL_HISTORY_SIZE = 5;     // recent raw labels kept per track; displayed
 const MAX_MISSED_FRAMES = 3;      // frames a track survives with no matching detection before it's dropped
 
 const startBtn = document.getElementById("startCameraBtn");
+const startAttendanceBtn = document.getElementById("startAttendanceBtn");
 const stopBtn = document.getElementById("stopCameraBtn");
 const status = document.getElementById("liveStatus");
 const stage = document.getElementById("liveStage");
@@ -26,11 +27,12 @@ let consecutiveErrors = 0;
 let tracks = [];
 let nextTrackId = 0;
 
-// A kiosk device opens this page as live.html?autostart=true so it runs
-// unattended with no button click - only that instance should log
-// attendance, so someone manually testing recognition at their desk on this
-// same page doesn't spuriously log themselves as "in the office".
-const isKioskMode = new URLSearchParams(window.location.search).get("autostart") === "true";
+// True whenever this session should log attendance - either a kiosk device
+// opened as live.html?autostart=true (unattended, no button click), or
+// someone explicitly clicked "Start Camera (Attendance)" below. Plain
+// "Start Camera" never records attendance, so testing recognition at your
+// desk doesn't spuriously log you as "in the office".
+let isKioskMode = new URLSearchParams(window.location.search).get("autostart") === "true";
 
 function resizeCanvasToElement(canvas, referenceEl) {
   canvas.width = referenceEl.clientWidth;
@@ -226,6 +228,16 @@ async function detect(blob, identify) {
 async function detectLoop() {
   while (running) {
     try {
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        // Right after startCamera() attaches the stream, videoWidth/Height
+        // can still be 0 for a moment until the browser loads the stream's
+        // metadata - capturing now would produce a zero-size frame, and
+        // toBlob resolves that as null rather than a Blob, breaking the
+        // upload. Wait a beat instead of treating this as a real error.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        continue;
+      }
+
       captureCanvas.width = video.videoWidth;
       captureCanvas.height = video.videoHeight;
       captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
@@ -255,6 +267,7 @@ async function detectLoop() {
 
 async function startCamera() {
   startBtn.disabled = true;
+  startAttendanceBtn.disabled = true;
   status.textContent = "Requesting camera access...";
 
   try {
@@ -269,6 +282,7 @@ async function startCamera() {
   } catch (err) {
     status.textContent = `Error: ${err.message}`;
     startBtn.disabled = false;
+    startAttendanceBtn.disabled = false;
     return;
   }
 
@@ -297,10 +311,18 @@ function stopCamera() {
   canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
   status.textContent = "Camera stopped.";
   startBtn.disabled = false;
+  startAttendanceBtn.disabled = false;
   stopBtn.disabled = true;
 }
 
-startBtn.addEventListener("click", startCamera);
+startBtn.addEventListener("click", () => {
+  isKioskMode = false;
+  startCamera();
+});
+startAttendanceBtn.addEventListener("click", () => {
+  isKioskMode = true;
+  startCamera();
+});
 stopBtn.addEventListener("click", stopCamera);
 window.addEventListener("pagehide", stopCamera);
 
