@@ -16,10 +16,21 @@ namespace ObjectCounterApp.Core
         bool IsPresent,
         IReadOnlyList<AttendanceSession> Sessions);
 
+    public enum AttendanceEditResult
+    {
+        Success,
+        EmployeeNotFound,
+        SessionIndexOutOfRange,
+        InvalidRange
+    }
+
     public interface IAttendanceStore
     {
         bool RecordSighting(string name, DateTime timestamp);
         IReadOnlyList<EmployeeDaySummary> GetDaySummary(DateOnly date, DateTime? now = null);
+        AttendanceEditResult UpdateSession(DateOnly date, string name, int sessionIndex, DateTime start, DateTime end);
+        AttendanceEditResult AddSession(DateOnly date, string name, DateTime start, DateTime end);
+        bool DeleteSession(DateOnly date, string name, int sessionIndex);
     }
 
     // Persists attendance as one folder per day under a root directory, with one
@@ -90,6 +101,99 @@ namespace ObjectCounterApp.Core
             }
         }
 
+        // Manual correction: overwrites one session's Start/End. Re-sorts
+        // Sessions afterward - an edit can reorder sessions out of
+        // chronological order, and GetDaySummary assumes Sessions[0]/[^1]
+        // are the first/last session for the day.
+        public AttendanceEditResult UpdateSession(DateOnly date, string name, int sessionIndex, DateTime start, DateTime end)
+        {
+            if (end <= start)
+            {
+                return AttendanceEditResult.InvalidRange;
+            }
+
+            lock (_lock)
+            {
+                var day = GetOrLoadDay(date);
+                if (!day.TryGetValue(name, out var entry))
+                {
+                    return AttendanceEditResult.EmployeeNotFound;
+                }
+                if (sessionIndex < 0 || sessionIndex >= entry.Sessions.Count)
+                {
+                    return AttendanceEditResult.SessionIndexOutOfRange;
+                }
+
+                entry.Sessions[sessionIndex].Start = start;
+                entry.Sessions[sessionIndex].End = end;
+                entry.Sessions.Sort((a, b) => a.Start.CompareTo(b.Start));
+
+                Save(date, entry);
+                return AttendanceEditResult.Success;
+            }
+        }
+
+        // Manual correction: adds a session an employee never had recorded
+        // (e.g. they forgot to walk past the camera at all that day).
+        // Creates the employee's day entry if this is their first session.
+        public AttendanceEditResult AddSession(DateOnly date, string name, DateTime start, DateTime end)
+        {
+            if (end <= start)
+            {
+                return AttendanceEditResult.InvalidRange;
+            }
+
+            lock (_lock)
+            {
+                var day = GetOrLoadDay(date);
+                if (!day.TryGetValue(name, out var entry))
+                {
+                    entry = new EmployeeDayFile { Name = name };
+                    day[name] = entry;
+                }
+
+                entry.Sessions.Add(new SessionEntry { Start = start, End = end });
+                entry.Sessions.Sort((a, b) => a.Start.CompareTo(b.Start));
+
+                Save(date, entry);
+                return AttendanceEditResult.Success;
+            }
+        }
+
+        // Manual correction: removes a wrongly-recorded session. If it was
+        // the employee's only session that day, removes them from the day
+        // entirely (in memory and on disk) rather than leaving a zero-session
+        // entry - GetDaySummary assumes at least one session per employee,
+        // and GetOrLoadDay's own load path already skips zero-session files.
+        public bool DeleteSession(DateOnly date, string name, int sessionIndex)
+        {
+            lock (_lock)
+            {
+                var day = GetOrLoadDay(date);
+                if (!day.TryGetValue(name, out var entry))
+                {
+                    return false;
+                }
+                if (sessionIndex < 0 || sessionIndex >= entry.Sessions.Count)
+                {
+                    return false;
+                }
+
+                entry.Sessions.RemoveAt(sessionIndex);
+                if (entry.Sessions.Count == 0)
+                {
+                    day.Remove(name);
+                    DeleteFile(date, entry.Name);
+                }
+                else
+                {
+                    Save(date, entry);
+                }
+
+                return true;
+            }
+        }
+
         // Pure read - IsPresent is derived against `now` (defaults to DateTime.Now)
         // and never written back to disk, so there's no stale "open session" flag
         // that can get out of sync with reality.
@@ -155,6 +259,15 @@ namespace ObjectCounterApp.Core
             var filePath = Path.Combine(dayFolder, $"{SanitizeFileName(entry.Name)}.json");
             var json = JsonSerializer.Serialize(entry);
             File.WriteAllText(filePath, json);
+        }
+
+        private void DeleteFile(DateOnly date, string name)
+        {
+            var filePath = Path.Combine(DayFolderPath(date), $"{SanitizeFileName(name)}.json");
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
         }
 
         private static string SanitizeFileName(string name)
