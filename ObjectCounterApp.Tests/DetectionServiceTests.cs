@@ -18,12 +18,13 @@ namespace ObjectCounterApp.Tests
             return Task.FromResult(new TempFile(Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.jpg")));
         }
 
-        private static (Mock<IPersonDetector>, Mock<IPersonIdentifier>, Mock<IAttendanceStore>, Mock<IMultiObjectTracker>, DetectionService) MakeService()
+        private static (Mock<IPersonDetector>, Mock<IPersonIdentifier>, Mock<IAttendanceStore>, Mock<IMultiObjectTracker>, Mock<IFootTrafficStore>, DetectionService) MakeService()
         {
             var personDetectorMock = new Mock<IPersonDetector>();
             var personIdentifierMock = new Mock<IPersonIdentifier>();
             var attendanceStoreMock = new Mock<IAttendanceStore>();
             var trackerMock = new Mock<IMultiObjectTracker>();
+            var footTrafficStoreMock = new Mock<IFootTrafficStore>();
 
             // Default: echo raw detections through as 1:1 confirmed, unlocked
             // tracks, so tests that don't care about tracking state still get
@@ -41,15 +42,15 @@ namespace ObjectCounterApp.Tests
 
             var service = new DetectionService(
                 personDetectorMock.Object, personIdentifierMock.Object, attendanceStoreMock.Object,
-                tempFileServiceMock.Object, trackerMock.Object);
+                tempFileServiceMock.Object, trackerMock.Object, footTrafficStoreMock.Object);
 
-            return (personDetectorMock, personIdentifierMock, attendanceStoreMock, trackerMock, service);
+            return (personDetectorMock, personIdentifierMock, attendanceStoreMock, trackerMock, footTrafficStoreMock, service);
         }
 
         [Fact]
         public async Task DetectAsync_UsesPersonDetector_NotPersonIdentifier_WhenIdentifyIsFalse()
         {
-            var (detectorMock, identifierMock, _, _, service) = MakeService();
+            var (detectorMock, identifierMock, _, _, _, service) = MakeService();
             detectorMock.Setup(d => d.DetectPersons(It.IsAny<string>())).Returns(new List<Detection>());
 
             await service.DetectAsync(Mock.Of<IFormFile>(), identify: false, recordAttendance: false, cameraId: CameraId);
@@ -61,7 +62,7 @@ namespace ObjectCounterApp.Tests
         [Fact]
         public async Task DetectAsync_UsesPersonIdentifier_NotPersonDetector_WhenIdentifyIsTrue()
         {
-            var (detectorMock, identifierMock, _, _, service) = MakeService();
+            var (detectorMock, identifierMock, _, _, _, service) = MakeService();
             identifierMock.Setup(i => i.DetectAndIdentify(It.IsAny<string>())).Returns(new List<Detection>());
 
             await service.DetectAsync(Mock.Of<IFormFile>(), identify: true, recordAttendance: false, cameraId: CameraId);
@@ -73,7 +74,7 @@ namespace ObjectCounterApp.Tests
         [Fact]
         public async Task DetectAsync_MapsAllTrackedDetectionFields_ToDto()
         {
-            var (detectorMock, _, _, trackerMock, service) = MakeService();
+            var (detectorMock, _, _, trackerMock, _, service) = MakeService();
             detectorMock.Setup(d => d.DetectPersons(It.IsAny<string>())).Returns(new List<Detection>
             {
                 new("Person", 0.5f, 0, 0, 1, 1, true)
@@ -114,7 +115,7 @@ namespace ObjectCounterApp.Tests
         [Fact]
         public async Task DetectAsync_RecordsSighting_WhenIdentityLockedAndTriggerAllowed()
         {
-            var (_, identifierMock, attendanceStoreMock, trackerMock, service) = MakeService();
+            var (_, identifierMock, attendanceStoreMock, trackerMock, _, service) = MakeService();
             identifierMock.Setup(i => i.DetectAndIdentify(It.IsAny<string>())).Returns(new List<Detection>());
 
             var tracked = new List<TrackedDetection>
@@ -134,7 +135,7 @@ namespace ObjectCounterApp.Tests
         [Fact]
         public async Task DetectAsync_DoesNotRecordSighting_WhenIdentityNotLocked()
         {
-            var (_, identifierMock, attendanceStoreMock, trackerMock, service) = MakeService();
+            var (_, identifierMock, attendanceStoreMock, trackerMock, _, service) = MakeService();
             identifierMock.Setup(i => i.DetectAndIdentify(It.IsAny<string>())).Returns(new List<Detection>());
 
             var tracked = new List<TrackedDetection>
@@ -153,7 +154,7 @@ namespace ObjectCounterApp.Tests
         [Fact]
         public async Task DetectAsync_DoesNotRecordSighting_WhenLockedToUnknown()
         {
-            var (_, identifierMock, attendanceStoreMock, trackerMock, service) = MakeService();
+            var (_, identifierMock, attendanceStoreMock, trackerMock, _, service) = MakeService();
             identifierMock.Setup(i => i.DetectAndIdentify(It.IsAny<string>())).Returns(new List<Detection>());
 
             var tracked = new List<TrackedDetection>
@@ -172,7 +173,7 @@ namespace ObjectCounterApp.Tests
         [Fact]
         public async Task DetectAsync_DoesNotRecordSighting_WhenAttendanceTriggerIsThrottled()
         {
-            var (_, identifierMock, attendanceStoreMock, trackerMock, service) = MakeService();
+            var (_, identifierMock, attendanceStoreMock, trackerMock, _, service) = MakeService();
             identifierMock.Setup(i => i.DetectAndIdentify(It.IsAny<string>())).Returns(new List<Detection>());
 
             var tracked = new List<TrackedDetection>
@@ -195,7 +196,7 @@ namespace ObjectCounterApp.Tests
         [Fact]
         public async Task DetectAsync_NeverRecordsSighting_WhenRecordAttendanceIsFalse()
         {
-            var (_, identifierMock, attendanceStoreMock, trackerMock, service) = MakeService();
+            var (_, identifierMock, attendanceStoreMock, trackerMock, _, service) = MakeService();
             identifierMock.Setup(i => i.DetectAndIdentify(It.IsAny<string>())).Returns(new List<Detection>());
 
             var tracked = new List<TrackedDetection>
@@ -215,12 +216,75 @@ namespace ObjectCounterApp.Tests
         [Fact]
         public async Task DetectAsync_PassesCameraId_ThroughToTracker()
         {
-            var (detectorMock, _, _, trackerMock, service) = MakeService();
+            var (detectorMock, _, _, trackerMock, _, service) = MakeService();
             detectorMock.Setup(d => d.DetectPersons(It.IsAny<string>())).Returns(new List<Detection>());
 
             await service.DetectAsync(Mock.Of<IFormFile>(), identify: false, recordAttendance: false, cameraId: "gate-camera");
 
             trackerMock.Verify(t => t.Update("gate-camera", It.IsAny<IReadOnlyList<Detection>>(), It.IsAny<DateTime>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task DetectAsync_RecordsFootTrafficVisit_ForEachLikelyRealTrackedDetection()
+        {
+            var (detectorMock, _, _, trackerMock, footTrafficStoreMock, service) = MakeService();
+            detectorMock.Setup(d => d.DetectPersons(It.IsAny<string>())).Returns(new List<Detection>());
+
+            var tracked = new List<TrackedDetection>
+            {
+                new(1, "Person", 0.9f, 0, 0, 1, 1, true, IsConfirmed: true, IsCoasting: false,
+                    IdentityName: null, FaceX1: null, FaceY1: null, FaceX2: null, FaceY2: null,
+                    IsIdentityLocked: false, LockedIdentityName: null),
+                new(2, "Person", 0.8f, 0, 0, 1, 1, true, IsConfirmed: true, IsCoasting: false,
+                    IdentityName: null, FaceX1: null, FaceY1: null, FaceX2: null, FaceY2: null,
+                    IsIdentityLocked: false, LockedIdentityName: null)
+            };
+            trackerMock.Setup(t => t.Update(It.IsAny<string>(), It.IsAny<IReadOnlyList<Detection>>(), It.IsAny<DateTime>())).Returns(tracked);
+
+            await service.DetectAsync(Mock.Of<IFormFile>(), identify: false, recordAttendance: false, cameraId: CameraId);
+
+            footTrafficStoreMock.Verify(f => f.RecordVisit(CameraId, 1, It.IsAny<DateTime>()), Times.Once);
+            footTrafficStoreMock.Verify(f => f.RecordVisit(CameraId, 2, It.IsAny<DateTime>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task DetectAsync_DoesNotRecordFootTrafficVisit_ForDetectionsThatArentLikelyReal()
+        {
+            var (detectorMock, _, _, trackerMock, footTrafficStoreMock, service) = MakeService();
+            detectorMock.Setup(d => d.DetectPersons(It.IsAny<string>())).Returns(new List<Detection>());
+
+            var tracked = new List<TrackedDetection>
+            {
+                new(1, "Person", 0.6f, 0, 0, 1, 1, false, IsConfirmed: true, IsCoasting: false,
+                    IdentityName: null, FaceX1: null, FaceY1: null, FaceX2: null, FaceY2: null,
+                    IsIdentityLocked: false, LockedIdentityName: null)
+            };
+            trackerMock.Setup(t => t.Update(It.IsAny<string>(), It.IsAny<IReadOnlyList<Detection>>(), It.IsAny<DateTime>())).Returns(tracked);
+
+            await service.DetectAsync(Mock.Of<IFormFile>(), identify: false, recordAttendance: false, cameraId: CameraId);
+
+            footTrafficStoreMock.Verify(f => f.RecordVisit(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<DateTime>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task DetectAsync_RecordsFootTrafficVisit_RegardlessOfIdentifyOrRecordAttendanceFlags()
+        {
+            var (_, identifierMock, _, trackerMock, footTrafficStoreMock, service) = MakeService();
+            identifierMock.Setup(i => i.DetectAndIdentify(It.IsAny<string>())).Returns(new List<Detection>());
+
+            var tracked = new List<TrackedDetection>
+            {
+                new(1, "Person", 0.9f, 0, 0, 1, 1, true, IsConfirmed: true, IsCoasting: false,
+                    IdentityName: null, FaceX1: null, FaceY1: null, FaceX2: null, FaceY2: null,
+                    IsIdentityLocked: false, LockedIdentityName: null)
+            };
+            trackerMock.Setup(t => t.Update(It.IsAny<string>(), It.IsAny<IReadOnlyList<Detection>>(), It.IsAny<DateTime>())).Returns(tracked);
+
+            // identify: true but recordAttendance: false - foot traffic must
+            // still be counted, since it isn't gated behind either flag.
+            await service.DetectAsync(Mock.Of<IFormFile>(), identify: true, recordAttendance: false, cameraId: CameraId);
+
+            footTrafficStoreMock.Verify(f => f.RecordVisit(CameraId, 1, It.IsAny<DateTime>()), Times.Once);
         }
     }
 }

@@ -19,6 +19,14 @@ namespace ObjectCounterApp.Core
         // track no longer exists). This is what keeps AttendanceStore from being
         // written every single frame a track stays locked.
         bool TryMarkAttendanceTrigger(string cameraId, int trackId, DateTime now);
+
+        // Count of this camera's currently-held tracks (Active + Coasting),
+        // 0 if the camera is unknown. A live read of state the tracker
+        // already maintains - accurate only while that camera's Update is
+        // actively being called; a camera that's stopped sending frames just
+        // holds its last state until the normal coasting timeout would have
+        // dropped each track.
+        int GetLiveOccupancy(string cameraId);
     }
 
     // Lightweight per-camera multi-object tracker: constant-velocity (alpha-beta
@@ -321,6 +329,19 @@ namespace ObjectCounterApp.Core
 
                 track.LastAttendanceTriggerTimestamp = now;
                 return true;
+            }
+        }
+
+        public int GetLiveOccupancy(string cameraId)
+        {
+            lock (_lock)
+            {
+                if (!_cameras.TryGetValue(cameraId, out var camera))
+                {
+                    return 0;
+                }
+
+                return camera.Tracks.Values.Count(t => t.State != TrackState.Tentative);
             }
         }
 

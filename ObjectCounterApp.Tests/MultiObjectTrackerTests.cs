@@ -245,5 +245,43 @@ namespace ObjectCounterApp.Tests
             var tracker = MakeTracker();
             Assert.False(tracker.TryMarkAttendanceTrigger("cam", 999, T0));
         }
+
+        [Fact]
+        public void GetLiveOccupancy_ReturnsZero_ForUnknownCamera()
+        {
+            var tracker = MakeTracker();
+            Assert.Equal(0, tracker.GetLiveOccupancy("nonexistent-camera"));
+        }
+
+        [Fact]
+        public void GetLiveOccupancy_ReturnsTrackCount_AfterUpdateCreatesTracks()
+        {
+            var tracker = MakeTracker();
+            tracker.Update("cam", new[] { PersonDetection(0.10f), PersonDetection(0.80f) }, T0);
+
+            Assert.Equal(2, tracker.GetLiveOccupancy("cam"));
+        }
+
+        [Fact]
+        public void GetLiveOccupancy_StillCountsATrack_WhileCoasting()
+        {
+            var tracker = MakeTracker(coastingGraceSeconds: 1.5);
+            tracker.Update("cam", new[] { PersonDetection(0.10f) }, T0);
+
+            tracker.Update("cam", Array.Empty<Detection>(), T0.AddSeconds(1.0));
+
+            Assert.Equal(1, tracker.GetLiveOccupancy("cam"));
+        }
+
+        [Fact]
+        public void GetLiveOccupancy_DropsToZero_AfterTrackAgesOutPastCoastingGrace()
+        {
+            var tracker = MakeTracker(coastingGraceSeconds: 1.5);
+            tracker.Update("cam", new[] { PersonDetection(0.10f) }, T0);
+
+            tracker.Update("cam", Array.Empty<Detection>(), T0.AddSeconds(2.0));
+
+            Assert.Equal(0, tracker.GetLiveOccupancy("cam"));
+        }
     }
 }

@@ -21,19 +21,22 @@ namespace ObjectCounterApp.Web.Services
         private readonly IAttendanceStore _attendanceStore;
         private readonly ITempFileService _tempFileService;
         private readonly IMultiObjectTracker _tracker;
+        private readonly IFootTrafficStore _footTrafficStore;
 
         public DetectionService(
             IPersonDetector personDetector,
             IPersonIdentifier personIdentifier,
             IAttendanceStore attendanceStore,
             ITempFileService tempFileService,
-            IMultiObjectTracker tracker)
+            IMultiObjectTracker tracker,
+            IFootTrafficStore footTrafficStore)
         {
             _personDetector = personDetector;
             _personIdentifier = personIdentifier;
             _attendanceStore = attendanceStore;
             _tempFileService = tempFileService;
             _tracker = tracker;
+            _footTrafficStore = footTrafficStore;
         }
 
         public async Task<DetectResponseDto> DetectAsync(IFormFile file, bool identify, bool recordAttendance, string cameraId)
@@ -46,6 +49,22 @@ namespace ObjectCounterApp.Web.Services
 
             var now = DateTime.Now;
             var tracked = _tracker.Update(cameraId, detections, now);
+
+            // Anonymous foot-traffic counting - runs unconditionally (not
+            // gated behind identify/recordAttendance) since it needs no
+            // identity, just the track's existence. IsLikelyReal filters out
+            // "person-like" false positives (mannequins/posters) so they
+            // don't count as a visit. FootTrafficStore itself is idempotent
+            // per TrackId, so calling this every frame a track stays alive
+            // is safe - only the first frame for a given TrackId actually
+            // writes anything.
+            foreach (var t in tracked)
+            {
+                if (t.IsLikelyReal)
+                {
+                    _footTrafficStore.RecordVisit(cameraId, t.TrackId, now);
+                }
+            }
 
             // Only a track whose identity has actually locked (a majority of
             // recent face-bearing frames agree) can record attendance, and
