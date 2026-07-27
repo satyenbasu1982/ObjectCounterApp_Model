@@ -31,8 +31,9 @@ namespace ObjectCounterApp.Web.Controllers
 
             bool identify = Request.Query["identify"] == "true";
             bool recordAttendance = identify && Request.Query["attendance"] == "true";
+            string cameraId = Request.Query["cameraId"].FirstOrDefault() ?? DetectionService.DefaultCameraId;
 
-            var result = await _detectionService.DetectAsync(file, identify, recordAttendance);
+            var result = await _detectionService.DetectAsync(file, identify, recordAttendance, cameraId);
             return Ok(result);
         }
     }

@@ -9,6 +9,8 @@ var sfaceModelPath = Path.Combine(AppContext.BaseDirectory, "face_recognition_sf
 var dataSetPath = Path.Combine(builder.Environment.ContentRootPath, "..", "DataSet");
 var attendancePath = Path.Combine(dataSetPath, "Attandance");
 var absenceTimeoutMinutes = builder.Configuration.GetValue("Attendance:AbsenceTimeoutMinutes", 1);
+var coastingGraceSeconds = builder.Configuration.GetValue("Tracking:CoastingGraceSeconds", 1.5);
+var attendanceReconfirmSeconds = builder.Configuration.GetValue("Tracking:AttendanceReconfirmSeconds", 20);
 
 // EnrolledPeopleStore and PersonDetector are registered under both their
 // concrete type and their interface (same instance) because
@@ -25,6 +27,8 @@ builder.Services.AddSingleton(peopleStore);
 builder.Services.AddSingleton<IEnrolledPeopleStore>(peopleStore);
 builder.Services.AddSingleton<IAttendanceStore>(new AttendanceStore(attendancePath, TimeSpan.FromMinutes(absenceTimeoutMinutes)));
 builder.Services.AddSingleton<IPersonIdentifier, PersonIdentifier>();
+builder.Services.AddSingleton<IMultiObjectTracker>(new MultiObjectTracker(
+    TimeSpan.FromSeconds(coastingGraceSeconds), TimeSpan.FromSeconds(attendanceReconfirmSeconds)));
 
 builder.Services.AddSingleton<ITempFileService, TempFileService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
