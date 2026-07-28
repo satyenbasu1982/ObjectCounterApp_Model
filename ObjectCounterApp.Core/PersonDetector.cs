@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.ML;
+using Microsoft.ML.Transforms.Image;
+using SkiaSharp;
 
 namespace ObjectCounterApp.Core
 {
@@ -29,8 +32,15 @@ namespace ObjectCounterApp.Core
         {
             var mlContext = new MLContext();
 
+            // IsoPad letterboxes (scales to fit, pads the shorter axis) instead of
+            // the default IsoCrop, which silently cropped ~20% off each side of a
+            // 16:9 webcam frame and - more importantly - fed the model a crop
+            // window that didn't match the letterboxed images it was trained on
+            // (Ultralytics YOLO's own default preprocessing), producing degenerate
+            // near-full-frame boxes that made multiple people impossible to tell
+            // apart. See DetectPersons for the matching coordinate un-letterboxing.
             var pipeline = mlContext.Transforms.LoadImages("LoadedImage", imageFolder: "", inputColumnName: nameof(ImageInput.ImagePath))
-                .Append(mlContext.Transforms.ResizeImages("ResizedImage", imageWidth: 640, imageHeight: 640, inputColumnName: "LoadedImage"))
+                .Append(mlContext.Transforms.ResizeImages("ResizedImage", imageWidth: 640, imageHeight: 640, inputColumnName: "LoadedImage", resizing: ImageResizingEstimator.ResizingKind.IsoPad))
                 .Append(mlContext.Transforms.ExtractPixels(outputColumnName: "images", inputColumnName: "ResizedImage", scaleImage: 1f / 255f))
                 .Append(mlContext.Transforms.ApplyOnnxModel(
                     outputColumnNames: new[] { "output0" },
@@ -46,6 +56,10 @@ namespace ObjectCounterApp.Core
         // may issue overlapping requests (e.g. periodic video-frame detection).
         public List<Detection> DetectPersons(string imagePath)
         {
+            var imageInfo = SKBitmap.DecodeBounds(imagePath);
+            int origWidth = imageInfo.Width;
+            int origHeight = imageInfo.Height;
+
             PredictionOutput prediction;
             lock (_lock)
             {
@@ -54,16 +68,24 @@ namespace ObjectCounterApp.Core
 
             var boxes = FindPersonBoxes(prediction.OutputTensor);
 
+            // Undo IsoPad's letterboxing: the model saw the image scaled to fit
+            // within 640x640 (preserving aspect ratio) and centered, with the
+            // shorter axis padded - box coordinates are in that padded canvas, not
+            // in the original image, until we reverse the same scale/offset here.
+            float scale = Math.Min(ModelInputSize / origWidth, ModelInputSize / origHeight);
+            float padX = (ModelInputSize - (origWidth * scale)) / 2f;
+            float padY = (ModelInputSize - (origHeight * scale)) / 2f;
+
             var detections = new List<Detection>(boxes.Count);
             foreach (var box in boxes)
             {
                 detections.Add(new Detection(
                     Label: "Person",
                     Score: box.Score,
-                    X1: Clamp01(box.X1 / ModelInputSize),
-                    Y1: Clamp01(box.Y1 / ModelInputSize),
-                    X2: Clamp01(box.X2 / ModelInputSize),
-                    Y2: Clamp01(box.Y2 / ModelInputSize),
+                    X1: Clamp01((box.X1 - padX) / scale / origWidth),
+                    Y1: Clamp01((box.Y1 - padY) / scale / origHeight),
+                    X2: Clamp01((box.X2 - padX) / scale / origWidth),
+                    Y2: Clamp01((box.Y2 - padY) / scale / origHeight),
                     IsLikelyReal: box.Score > box.PersonLikeScore));
             }
 
