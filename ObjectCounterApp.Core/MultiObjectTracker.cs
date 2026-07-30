@@ -78,6 +78,11 @@ namespace ObjectCounterApp.Core
             // frame where detection simply failed isn't evidence the person
             // changed, it's just a gap (same rule the client tracker used).
             public readonly Queue<string> IdentityVotes = new();
+
+            // The window's current plurality vote (not a single frame's raw
+            // result) - see PushVote. This is what's displayed before a full
+            // lock, so it needs its own hysteresis or it flickers exactly the
+            // way a single raw per-frame match would.
             public string? LastIdentityName;
             public string? LockedIdentityName;
             public bool IsIdentityLocked;
@@ -355,14 +360,21 @@ namespace ObjectCounterApp.Core
             return camera;
         }
 
+        // Pushes this frame's raw vote, then re-derives LastIdentityName as
+        // the window's plurality (not the raw vote itself) - a single
+        // dissenting frame shouldn't flip the displayed name any more than it
+        // should flip the lock, it should just dilute the window slightly.
+        // Ties are broken toward whatever's already displayed (the incumbent
+        // passed to FindPlurality), so this doesn't introduce its own flicker.
         private static void PushVote(Track track, string identityName)
         {
-            track.LastIdentityName = identityName;
             track.IdentityVotes.Enqueue(identityName);
             while (track.IdentityVotes.Count > IdentityLockWindowSize)
             {
                 track.IdentityVotes.Dequeue();
             }
+
+            track.LastIdentityName = FindPlurality(track.IdentityVotes, track.LastIdentityName).name;
         }
 
         // Re-evaluates the lock against the whole current window every time
@@ -380,14 +392,28 @@ namespace ObjectCounterApp.Core
                 return;
             }
 
+            var (bestName, bestCount) = FindPlurality(track.IdentityVotes, track.LockedIdentityName);
+
+            if (bestName is not null && bestCount * 2 > track.IdentityVotes.Count)
+            {
+                track.LockedIdentityName = bestName;
+                track.IsIdentityLocked = true;
+            }
+        }
+
+        // Tallies votes in the window and returns the plurality name, seeded
+        // from `incumbent` so a tie (or nothing beating it) leaves the
+        // incumbent in place rather than picking an arbitrary new winner.
+        private static (string? name, int count) FindPlurality(Queue<string> votes, string? incumbent)
+        {
             var counts = new Dictionary<string, int>();
-            foreach (var vote in track.IdentityVotes)
+            foreach (var vote in votes)
             {
                 counts[vote] = counts.TryGetValue(vote, out var c) ? c + 1 : 1;
             }
 
-            string? bestName = track.LockedIdentityName;
-            int bestCount = bestName is not null && counts.TryGetValue(bestName, out var lockedCount) ? lockedCount : 0;
+            string? bestName = incumbent;
+            int bestCount = bestName is not null && counts.TryGetValue(bestName, out var incumbentCount) ? incumbentCount : 0;
 
             foreach (var (name, count) in counts)
             {
@@ -398,11 +424,7 @@ namespace ObjectCounterApp.Core
                 }
             }
 
-            if (bestName is not null && bestCount * 2 > track.IdentityVotes.Count)
-            {
-                track.LockedIdentityName = bestName;
-                track.IsIdentityLocked = true;
-            }
+            return (bestName, bestCount);
         }
 
         private static float ComputeIoU(float ax1, float ay1, float ax2, float ay2, float bx1, float by1, float bx2, float by2)

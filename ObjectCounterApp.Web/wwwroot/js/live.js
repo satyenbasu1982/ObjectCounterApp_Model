@@ -50,9 +50,10 @@ function renderDetections(canvas, detections) {
       ? { x1: det.faceX1, y1: det.faceY1, x2: det.faceX2, y2: det.faceY2 }
       : { x1: det.x1, y1: det.y1, x2: det.x2, y2: det.y2 };
 
-    // Before a track's identity has locked, fall back to this frame's raw
-    // result so a brand-new track shows something immediately instead of a
-    // blank label.
+    // Before a track's identity has locked, fall back to the track's current
+    // best-guess (already smoothed server-side across its recent-frame
+    // window, not a single frame's raw result) so a brand-new track shows
+    // something immediately instead of a blank label.
     const label = !det.isLikelyReal
       ? "Possibly not real"
       : (det.isIdentityLocked ? det.lockedIdentityName : (det.identityName || det.label));

@@ -185,6 +185,24 @@ namespace ObjectCounterApp.Tests
         }
 
         [Fact]
+        public void Update_UnlockedIdentityName_DoesNotFlicker_OnASingleDissentingVote()
+        {
+            var tracker = MakeTracker();
+
+            tracker.Update("cam", new[] { PersonDetection(0.10f, identityName: "Satyen", withFace: true) }, T0);
+            tracker.Update("cam", new[] { PersonDetection(0.10f, identityName: "Satyen", withFace: true) }, T0.AddSeconds(0.1));
+
+            // A single dissenting "Unknown" frame, well before MinVotesToLock
+            // is even reached - previously this overwrote the raw per-frame
+            // name shown in the UI every time, which is the reported flicker.
+            var result = tracker.Update("cam", new[] { PersonDetection(0.10f, identityName: null, withFace: true) }, T0.AddSeconds(0.2));
+
+            var track = Assert.Single(result);
+            Assert.False(track.IsIdentityLocked);
+            Assert.Equal("Satyen", track.IdentityName);
+        }
+
+        [Fact]
         public void Update_DoesNotVote_OnFramesWithNoFaceBox()
         {
             var tracker = MakeTracker();
